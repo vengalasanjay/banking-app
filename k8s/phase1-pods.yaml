@@ -12,14 +12,14 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: mysql
-  namespace: banking-poc
+  namespace: testing
   labels:
     app: mysql
     tier: database
     phase: "1"
 spec:
   nodeSelector:
-    role: banking-poc          # pins pod to ip-10-0-3-126
+    role: testing         # pins pod to ip-10-0-3-126
   containers:
     - name: mysql
       image: mysql:8.0
@@ -56,7 +56,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: mysql-init-sql
-  namespace: banking-poc
+  namespace: testing
 data:
   init.sql: |
     CREATE DATABASE IF NOT EXISTS bankingdb;
@@ -95,14 +95,14 @@ apiVersion: v1
 kind: Service
 metadata:
   name: mysql
-  namespace: banking-poc
+  namespace: testing
 spec:
   selector:
     app: mysql
   ports:
     - port: 3306
       targetPort: 3306
-  clusterIP: None    # headless for Phase 1 (will change when StatefulSet)
+
  
 ---
 # ── Backend Pod ───────────────────────────────────────────────────────────────
@@ -110,17 +110,17 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: backend
-  namespace: banking-poc
+  namespace: testing
   labels:
     app: backend
     tier: application
     phase: "1"
 spec:
   nodeSelector:
-    role: banking-poc
+    role: testing
   containers:
     - name: backend
-      image: ghcr.io/GITHUB_USERNAME/banking-backend:latest
+      image: sanjayvengala16/bankapp-backend:1.0.0
       ports:
         - containerPort: 5000
       envFrom:
@@ -134,38 +134,38 @@ spec:
           port: 5000
         initialDelaySeconds: 10
         periodSeconds: 5
- 
+
 ---
 # ── Backend ClusterIP Service ─────────────────────────────────────────────────
 apiVersion: v1
 kind: Service
 metadata:
   name: backend
-  namespace: banking-poc
+  namespace: testing
 spec:
   selector:
     app: backend
   ports:
     - port: 5000
       targetPort: 5000
- 
+
 ---
 # ── Frontend Pod ──────────────────────────────────────────────────────────────
 apiVersion: v1
 kind: Pod
 metadata:
   name: frontend
-  namespace: banking-poc
+  namespace: testing
   labels:
     app: frontend
     tier: presentation
     phase: "1"
 spec:
   nodeSelector:
-    role: banking-poc
+    role: testing
   containers:
     - name: frontend
-      image: ghcr.io/GITHUB_USERNAME/banking-frontend:latest
+      image: sanjayvengala16/bankapp-frontend:1.0.0
       ports:
         - containerPort: 80
       env:
@@ -178,7 +178,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: frontend
-  namespace: banking-poc
+  namespace: testing
 spec:
   type: NodePort
   selector:
