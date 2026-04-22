@@ -3,10 +3,10 @@
 # Learning goal: understand Pod spec, env vars, volumes, Services
 # Node pinned to: ip-10-0-3-126.ec2.internal
 # ═══════════════════════════════════════════════════════════════════════════════
-
+ 
 # STEP 0: Label your node first!
 # kubectl label node ip-10-0-3-126.ec2.internal role=banking-poc
-
+ 
 # ── MySQL Pod ─────────────────────────────────────────────────────────────────
 apiVersion: v1
 kind: Pod
@@ -49,7 +49,7 @@ spec:
     - name: init-sql
       configMap:
         name: mysql-init-sql
-
+ 
 ---
 # ── MySQL init SQL as ConfigMap ───────────────────────────────────────────────
 apiVersion: v1
@@ -88,7 +88,7 @@ data:
       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
       FOREIGN KEY (account_id) REFERENCES accounts(id)
     );
-
+ 
 ---
 # ── MySQL ClusterIP Service ───────────────────────────────────────────────────
 apiVersion: v1
@@ -103,7 +103,7 @@ spec:
     - port: 3306
       targetPort: 3306
   clusterIP: None    # headless for Phase 1 (will change when StatefulSet)
-
+ 
 ---
 # ── Backend Pod ───────────────────────────────────────────────────────────────
 apiVersion: v1
@@ -134,7 +134,7 @@ spec:
           port: 5000
         initialDelaySeconds: 10
         periodSeconds: 5
-
+ 
 ---
 # ── Backend ClusterIP Service ─────────────────────────────────────────────────
 apiVersion: v1
@@ -148,7 +148,7 @@ spec:
   ports:
     - port: 5000
       targetPort: 5000
-
+ 
 ---
 # ── Frontend Pod ──────────────────────────────────────────────────────────────
 apiVersion: v1
@@ -168,7 +168,10 @@ spec:
       image: ghcr.io/GITHUB_USERNAME/banking-frontend:latest
       ports:
         - containerPort: 80
-
+      env:
+        - name: BACKEND_URL
+          value: "http://backend:5000"   # ClusterIP Service name — resolves inside cluster
+ 
 ---
 # ── Frontend NodePort Service (access from browser) ───────────────────────────
 apiVersion: v1

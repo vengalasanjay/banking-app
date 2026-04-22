@@ -43,6 +43,9 @@ services:
       - backend
     ports:
       - "3000:80"
+    environment:
+      # Points to the backend service name inside docker-compose network
+      BACKEND_URL: http://backend:5000
 
 volumes:
   mysql-data:
