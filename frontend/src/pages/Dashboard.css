@@ -1,0 +1,118 @@
+.dash-wrap {
+  display: flex;
+  min-height: 100vh;
+}
+
+/* ── Sidebar ─────────────────────────────────────────────── */
+.sidebar {
+  width: 240px;
+  background: var(--mid);
+  display: flex;
+  flex-direction: column;
+  padding: 24px 16px;
+  border-right: 1px solid #2a3550;
+  flex-shrink: 0;
+}
+.sidebar-logo {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--red);
+  margin-bottom: 28px;
+  padding-left: 4px;
+}
+.nav-label {
+  font-size: 10px;
+  color: var(--gray);
+  letter-spacing: 1px;
+  margin-bottom: 8px;
+  padding-left: 4px;
+}
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 10px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-bottom: 4px;
+  transition: background .15s;
+}
+.nav-item:hover  { background: rgba(255,255,255,.05); }
+.nav-item.active { background: var(--accent); }
+.nav-icon        { font-size: 20px; }
+.nav-acc-num     { font-size: 11px; font-weight: 600; font-family: monospace; }
+.nav-acc-type    { font-size: 10px; color: var(--gray); text-transform: capitalize; }
+.add-acc-btn     { width: 100%; margin-top: 10px; }
+
+.sidebar-footer {
+  margin-top: auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--gray);
+  padding-top: 16px;
+  border-top: 1px solid #2a3550;
+}
+
+/* ── Main ───────────────────────────────────────────────── */
+.dash-main {
+  flex: 1;
+  padding: 28px 32px;
+  overflow-y: auto;
+  background: var(--dark);
+}
+.dash-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+}
+.dash-header h1 { font-size: 20px; }
+.k8s-badge {
+  background: var(--accent);
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 11px;
+  color: var(--gray);
+}
+
+/* ── Balance card ───────────────────────────────────────── */
+.balance-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 24px;
+  background: linear-gradient(135deg, var(--accent) 0%, #1a3a6e 100%);
+  border: 1px solid #2a4a7f;
+}
+.balance-label  { font-size: 12px; color: var(--gray); margin-bottom: 6px; }
+.balance-amt    { font-size: 32px; font-weight: 700; letter-spacing: -1px; }
+.balance-acc    { font-size: 12px; color: var(--gray); margin-top: 6px; font-family: monospace; }
+.balance-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+/* ── Transactions ───────────────────────────────────────── */
+.tx-card   { }
+.tx-title  { font-size: 15px; font-weight: 600; margin-bottom: 16px; }
+.no-tx     { color: var(--gray); font-size: 13px; padding: 20px 0; text-align: center; }
+
+/* ── Modal ──────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.65);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 100;
+}
+.modal-box { width: 100%; max-width: 420px; padding: 28px 28px 24px; }
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 20px;
+}
+.modal-header h3 { font-size: 16px; }
+.modal-close {
+  background: transparent; color: var(--gray);
+  font-size: 16px; padding: 4px 8px; border-radius: 4px;
+}
+.modal-close:hover { background: rgba(255,255,255,.1); }
+.modal-body { display: flex; flex-direction: column; gap: 4px; }
+.modal-body .field { margin-bottom: 12px; }

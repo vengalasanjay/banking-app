@@ -1,0 +1,91 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# PHASE 2 — PersistentVolume + PersistentVolumeClaim
+# Learning goal: decouple storage lifecycle from Pod lifecycle
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── PersistentVolume (admin creates this) ─────────────────────────────────────
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: mysql-pv
+  labels:
+    type: local
+    app: mysql
+spec:
+  storageClassName: manual
+  capacity:
+    storage: 5Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain   # data survives PVC deletion
+  hostPath:
+    path: /data/banking/mysql-pv
+    type: DirectoryOrCreate
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: role
+              operator: In
+              values: [banking-poc]
+
+---
+# ── PersistentVolumeClaim (developer/app requests storage) ────────────────────
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-pvc
+  namespace: banking-poc
+spec:
+  storageClassName: manual
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  selector:
+    matchLabels:
+      app: mysql
+
+---
+# ── MySQL Pod now using PVC ───────────────────────────────────────────────────
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mysql
+  namespace: banking-poc
+  labels:
+    app: mysql
+    tier: database
+    phase: "2"
+spec:
+  nodeSelector:
+    role: banking-poc
+  containers:
+    - name: mysql
+      image: mysql:8.0
+      ports:
+        - containerPort: 3306
+      env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: banking-secret
+              key: DB_PASS
+        - name: MYSQL_DATABASE
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: DB_NAME
+      volumeMounts:
+        - name: mysql-storage
+          mountPath: /var/lib/mysql
+        - name: init-sql
+          mountPath: /docker-entrypoint-initdb.d
+  volumes:
+    - name: mysql-storage
+      persistentVolumeClaim:
+        claimName: mysql-pvc       # ← now using PVC instead of raw hostPath
+    - name: init-sql
+      configMap:
+        name: mysql-init-sql

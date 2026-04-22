@@ -1,0 +1,186 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# PHASE 1 — Manual Pod with hostPath volume
+# Learning goal: understand Pod spec, env vars, volumes, Services
+# Node pinned to: ip-10-0-3-126.ec2.internal
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# STEP 0: Label your node first!
+# kubectl label node ip-10-0-3-126.ec2.internal role=banking-poc
+
+# ── MySQL Pod ─────────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Pod
+metadata:
+  name: mysql
+  namespace: banking-poc
+  labels:
+    app: mysql
+    tier: database
+    phase: "1"
+spec:
+  nodeSelector:
+    role: banking-poc          # pins pod to ip-10-0-3-126
+  containers:
+    - name: mysql
+      image: mysql:8.0
+      ports:
+        - containerPort: 3306
+      env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: banking-secret
+              key: DB_PASS
+        - name: MYSQL_DATABASE
+          valueFrom:
+            configMapKeyRef:
+              name: banking-config
+              key: DB_NAME
+      volumeMounts:
+        - name: mysql-data
+          mountPath: /var/lib/mysql
+        - name: init-sql
+          mountPath: /docker-entrypoint-initdb.d
+  volumes:
+    - name: mysql-data
+      hostPath:
+        path: /data/banking/mysql   # created on the node automatically
+        type: DirectoryOrCreate
+    - name: init-sql
+      configMap:
+        name: mysql-init-sql
+
+---
+# ── MySQL init SQL as ConfigMap ───────────────────────────────────────────────
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: mysql-init-sql
+  namespace: banking-poc
+data:
+  init.sql: |
+    CREATE DATABASE IF NOT EXISTS bankingdb;
+    USE bankingdb;
+    CREATE TABLE IF NOT EXISTS users (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      username VARCHAR(50) UNIQUE NOT NULL,
+      email VARCHAR(100) UNIQUE NOT NULL,
+      password_hash VARCHAR(256) NOT NULL,
+      full_name VARCHAR(100) NOT NULL,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    );
+    CREATE TABLE IF NOT EXISTS accounts (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      user_id INT NOT NULL,
+      account_number VARCHAR(20) UNIQUE NOT NULL,
+      account_type ENUM('savings','checking') DEFAULT 'savings',
+      balance DECIMAL(15,2) DEFAULT 0.00,
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (user_id) REFERENCES users(id)
+    );
+    CREATE TABLE IF NOT EXISTS transactions (
+      id INT AUTO_INCREMENT PRIMARY KEY,
+      account_id INT NOT NULL,
+      type ENUM('deposit','withdrawal','transfer') NOT NULL,
+      amount DECIMAL(15,2) NOT NULL,
+      description VARCHAR(255),
+      reference_account VARCHAR(20),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      FOREIGN KEY (account_id) REFERENCES accounts(id)
+    );
+
+---
+# ── MySQL ClusterIP Service ───────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: banking-poc
+spec:
+  selector:
+    app: mysql
+  ports:
+    - port: 3306
+      targetPort: 3306
+  clusterIP: None    # headless for Phase 1 (will change when StatefulSet)
+
+---
+# ── Backend Pod ───────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Pod
+metadata:
+  name: backend
+  namespace: banking-poc
+  labels:
+    app: backend
+    tier: application
+    phase: "1"
+spec:
+  nodeSelector:
+    role: banking-poc
+  containers:
+    - name: backend
+      image: ghcr.io/GITHUB_USERNAME/banking-backend:latest
+      ports:
+        - containerPort: 5000
+      envFrom:
+        - configMapRef:
+            name: banking-config
+        - secretRef:
+            name: banking-secret
+      readinessProbe:
+        httpGet:
+          path: /health
+          port: 5000
+        initialDelaySeconds: 10
+        periodSeconds: 5
+
+---
+# ── Backend ClusterIP Service ─────────────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  namespace: banking-poc
+spec:
+  selector:
+    app: backend
+  ports:
+    - port: 5000
+      targetPort: 5000
+
+---
+# ── Frontend Pod ──────────────────────────────────────────────────────────────
+apiVersion: v1
+kind: Pod
+metadata:
+  name: frontend
+  namespace: banking-poc
+  labels:
+    app: frontend
+    tier: presentation
+    phase: "1"
+spec:
+  nodeSelector:
+    role: banking-poc
+  containers:
+    - name: frontend
+      image: ghcr.io/GITHUB_USERNAME/banking-frontend:latest
+      ports:
+        - containerPort: 80
+
+---
+# ── Frontend NodePort Service (access from browser) ───────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend
+  namespace: banking-poc
+spec:
+  type: NodePort
+  selector:
+    app: frontend
+  ports:
+    - port: 80
+      targetPort: 80
+      nodePort: 30080

@@ -1,0 +1,98 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# PHASE 5 — StatefulSet for MySQL
+# Learning goal: ordered startup, stable network identity, per-pod PVCs
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# ── Headless Service (required by StatefulSet for DNS) ────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: banking-poc
+  labels:
+    app: mysql
+spec:
+  clusterIP: None       # headless – pods get DNS: mysql-0.mysql.banking-poc.svc.cluster.local
+  selector:
+    app: mysql
+  ports:
+    - port: 3306
+      targetPort: 3306
+
+---
+# ── MySQL StatefulSet ─────────────────────────────────────────────────────────
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+  namespace: banking-poc
+  labels:
+    app: mysql
+    phase: "5"
+spec:
+  serviceName: mysql      # must match headless service name
+  replicas: 1             # single instance for learning; scale to 3 for HA later
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+        tier: database
+    spec:
+      nodeSelector:
+        role: banking-poc
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: banking-secret
+                  key: DB_PASS
+            - name: MYSQL_DATABASE
+              valueFrom:
+                configMapKeyRef:
+                  name: banking-config
+                  key: DB_NAME
+          volumeMounts:
+            - name: mysql-data          # matches volumeClaimTemplates name
+              mountPath: /var/lib/mysql
+            - name: init-sql
+              mountPath: /docker-entrypoint-initdb.d
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          readinessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+          livenessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost"]
+            initialDelaySeconds: 30
+            periodSeconds: 20
+      volumes:
+        - name: init-sql
+          configMap:
+            name: mysql-init-sql
+  # Each pod gets its own PVC automatically: mysql-data-mysql-0
+  volumeClaimTemplates:
+    - metadata:
+        name: mysql-data
+      spec:
+        storageClassName: manual
+        accessModes: [ReadWriteOnce]
+        resources:
+          requests:
+            storage: 5Gi

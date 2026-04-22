@@ -1,0 +1,194 @@
+# ═══════════════════════════════════════════════════════════════════════════════
+# PHASE 3 — ReplicaSet
+# Learning goal: self-healing, N replicas always running
+# ═══════════════════════════════════════════════════════════════════════════════
+
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: backend-rs
+  namespace: banking-poc
+  labels:
+    app: backend
+    phase: "3"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+        tier: application
+    spec:
+      nodeSelector:
+        role: banking-poc
+      containers:
+        - name: backend
+          image: ghcr.io/GITHUB_USERNAME/banking-backend:latest
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - configMapRef:
+                name: banking-config
+            - secretRef:
+                name: banking-secret
+
+---
+apiVersion: apps/v1
+kind: ReplicaSet
+metadata:
+  name: frontend-rs
+  namespace: banking-poc
+  labels:
+    app: frontend
+    phase: "3"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+        tier: presentation
+    spec:
+      nodeSelector:
+        role: banking-poc
+      containers:
+        - name: frontend
+          image: ghcr.io/GITHUB_USERNAME/banking-frontend:latest
+          ports:
+            - containerPort: 80
+
+---
+# ═══════════════════════════════════════════════════════════════════════════════
+# PHASE 4 — Deployment (replaces ReplicaSet)
+# Learning goal: rolling updates, rollback, strategy control
+# ═══════════════════════════════════════════════════════════════════════════════
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: banking-poc
+  labels:
+    app: backend
+    phase: "4"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: backend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: backend
+        tier: application
+    spec:
+      nodeSelector:
+        role: banking-poc
+      containers:
+        - name: backend
+          image: ghcr.io/GITHUB_USERNAME/banking-backend:latest
+          ports:
+            - containerPort: 5000
+          envFrom:
+            - configMapRef:
+                name: banking-config
+            - secretRef:
+                name: banking-secret
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 15
+            periodSeconds: 20
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 5000
+            initialDelaySeconds: 10
+            periodSeconds: 5
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+  namespace: banking-poc
+  labels:
+    app: frontend
+    phase: "4"
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: frontend
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: frontend
+        tier: presentation
+    spec:
+      nodeSelector:
+        role: banking-poc
+      containers:
+        - name: frontend
+          image: ghcr.io/GITHUB_USERNAME/banking-frontend:latest
+          ports:
+            - containerPort: 80
+          resources:
+            requests:
+              cpu: "50m"
+              memory: "64Mi"
+            limits:
+              cpu: "100m"
+              memory: "128Mi"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 15
+
+---
+# ── HPA for Backend (Phase 4 bonus) ──────────────────────────────────────────
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: backend-hpa
+  namespace: banking-poc
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: backend
+  minReplicas: 2
+  maxReplicas: 5
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60
